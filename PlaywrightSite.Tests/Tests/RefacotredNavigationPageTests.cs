@@ -13,6 +13,11 @@ public class RefactoredNavigationPageTests : TestBase
         var page = new RefactoredNavigationPage(Driver)
             .Open();
 
+        TestContext.Progress.WriteLine("Step: Verify main navigation exposes landmark accessibility semantics.");
+        Assert.That(() => page.IsMainNavigationAccessibleLandmark(),
+            Is.True.After(5000, 200),
+            "Main navigation should expose navigation role semantics and aria-label='Main'.");
+
         foreach (var linkName in RequiredNavigationLinks)
         {
             TestContext.Progress.WriteLine($"Step: Verify '{linkName}' is visible in the Main navigation.");

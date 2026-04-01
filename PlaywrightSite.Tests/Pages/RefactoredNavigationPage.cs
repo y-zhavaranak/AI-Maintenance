@@ -30,6 +30,19 @@ public class RefactoredNavigationPage : BasePage
         return WaitForNavigationLink(linkName).Displayed;
     }
 
+    public bool IsMainNavigationAccessibleLandmark()
+    {
+        var nav = WaitForElementVisible(MainNavigation);
+        var explicitRole = nav.GetDomAttribute("role");
+        var hasNavigationRoleSemantics = string.IsNullOrWhiteSpace(explicitRole)
+                                         || string.Equals(explicitRole, "navigation", StringComparison.OrdinalIgnoreCase);
+        var hasExpectedAriaLabel = string.Equals(nav.GetDomAttribute("aria-label"), "Main", StringComparison.OrdinalIgnoreCase);
+
+        return string.Equals(nav.TagName, "nav", StringComparison.OrdinalIgnoreCase)
+               && hasNavigationRoleSemantics
+               && hasExpectedAriaLabel;
+    }
+
     public bool IsNavigationLinkAccessibleByRoleAndName(string linkName)
     {
         var link = WaitForNavigationLink(linkName);

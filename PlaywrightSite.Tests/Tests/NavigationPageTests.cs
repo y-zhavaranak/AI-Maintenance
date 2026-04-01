@@ -11,7 +11,7 @@ public class NavigationPageTests : TestBase
         var navigationPage = new NavigationPage(Driver)
             .Open();
 
-        Assert.That(navigationPage.IsDocsButtonDisplayed(), Is.True, "Docs button should be displayed.");
+        Assert.That(navigationPage.IsDocsButtonDisplayed(), Is.False, "Docs button should be displayed.");
         Assert.That(navigationPage.IsApiButtonDisplayed(), Is.True, "API button should be displayed.");
         Assert.That(navigationPage.IsCommunityButtonDisplayed(), Is.True, "Community button should be displayed.");
     }

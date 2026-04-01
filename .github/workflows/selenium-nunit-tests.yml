@@ -31,7 +31,6 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-          cache: true
 
       # Ensure Chrome and virtual display are available for Selenium UI tests
       - name: Install browser dependencies

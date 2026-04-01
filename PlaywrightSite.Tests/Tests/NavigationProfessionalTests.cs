@@ -6,6 +6,7 @@ namespace PlaywrightSite.Tests.Tests;
 public class NavigationProfessionalTests : TestBase
 {
     private const string RequirementId = "TC-NAV-001";
+    private const string DocsLinkName = "Docs";
     private static readonly string[] RequiredNavigationLinks = ["Docs", "API", "Community"];
 
     [Test]
@@ -68,13 +69,13 @@ public class NavigationProfessionalTests : TestBase
             .Open();
 
         TestContext.Progress.WriteLine($"[{RequirementId}] Verify Docs is visible and enabled before click.");
-        Assert.That(() => page.IsNavigationLinkVisible("Docs") && page.IsNavigationLinkEnabled("Docs"),
+        Assert.That(() => page.IsNavigationLinkVisible(DocsLinkName) && page.IsNavigationLinkEnabled(DocsLinkName),
             Is.True.After(5000, 200),
             "Docs link should be visible and enabled before navigation.");
 
         // When
         TestContext.Progress.WriteLine($"[{RequirementId}] Click 'Docs' from main navigation.");
-        page.ClickNavigationLink("Docs");
+        page.ClickNavigationLink(DocsLinkName);
 
         // Then
         TestContext.Progress.WriteLine($"[{RequirementId}] Verify Docs does not land on API path.");

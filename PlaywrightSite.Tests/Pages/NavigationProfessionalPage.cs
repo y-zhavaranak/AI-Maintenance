@@ -2,7 +2,7 @@
 
 namespace PlaywrightSite.Tests.Pages;
 
-public class RefactoredNavigationPage : BasePage
+public class NavigationProfessionalPage : BasePage
 {
     private static readonly By MainNavigation = By.CssSelector("nav[aria-label='Main']");
 
@@ -14,25 +14,15 @@ public class RefactoredNavigationPage : BasePage
             ["Community"] = "/community/"
         };
 
-    public RefactoredNavigationPage(IWebDriver driver) : base(driver)
+    public NavigationProfessionalPage(IWebDriver driver) : base(driver)
     {
     }
 
-    public RefactoredNavigationPage Open()
+    public NavigationProfessionalPage Open()
     {
         Driver.Navigate().GoToUrl("https://playwright.dev/");
         WaitForElementVisible(MainNavigation);
         return this;
-    }
-
-    public bool IsNavigationLinkVisible(string linkName)
-    {
-        return WaitForNavigationLink(linkName).Displayed;
-    }
-
-    public bool IsNavigationLinkEnabled(string linkName)
-    {
-        return WaitForNavigationLink(linkName).Enabled;
     }
 
     public bool IsMainNavigationAccessibleLandmark()
@@ -47,6 +37,10 @@ public class RefactoredNavigationPage : BasePage
                && hasNavigationRoleSemantics
                && hasExpectedAriaLabel;
     }
+
+    public bool IsNavigationLinkVisible(string linkName) => WaitForNavigationLink(linkName).Displayed;
+
+    public bool IsNavigationLinkEnabled(string linkName) => WaitForNavigationLink(linkName).Enabled;
 
     public bool IsNavigationLinkAccessibleByRoleAndName(string linkName)
     {
@@ -72,11 +66,20 @@ public class RefactoredNavigationPage : BasePage
         var expectedPathPrefix = GetExpectedPathPrefix(linkName);
         return WaitForCondition(driver =>
         {
-            var destinationUrl = new Uri(driver.Url);
-            var isExpectedHost = string.Equals(destinationUrl.Host, "playwright.dev", StringComparison.OrdinalIgnoreCase);
-            var isExpectedPath = destinationUrl.AbsolutePath.StartsWith(expectedPathPrefix, StringComparison.OrdinalIgnoreCase);
+            var destination = new Uri(driver.Url);
+            return string.Equals(destination.Host, "playwright.dev", StringComparison.OrdinalIgnoreCase)
+                   && destination.AbsolutePath.StartsWith(expectedPathPrefix, StringComparison.OrdinalIgnoreCase);
+        });
+    }
 
-            return isExpectedHost && isExpectedPath;
+    public bool IsOnUnexpectedApiPathAfterDocsClick()
+    {
+        return WaitForCondition(driver =>
+        {
+            var destination = new Uri(driver.Url);
+            return string.Equals(destination.Host, "playwright.dev", StringComparison.OrdinalIgnoreCase)
+                   && destination.AbsolutePath.StartsWith("/docs/", StringComparison.OrdinalIgnoreCase)
+                   && !destination.AbsolutePath.StartsWith("/docs/api/", StringComparison.OrdinalIgnoreCase);
         });
     }
 

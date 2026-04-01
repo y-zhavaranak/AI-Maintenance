@@ -22,4 +22,9 @@ public abstract class BasePage
             return element.Displayed ? element : null;
         })!;
     }
+
+    protected bool WaitForCondition(Func<IWebDriver, bool> condition)
+    {
+        return _wait.Until(condition);
+    }
 }

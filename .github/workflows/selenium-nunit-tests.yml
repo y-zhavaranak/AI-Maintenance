@@ -1,0 +1,207 @@
+name: Selenium NUnit Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selenium-nunit-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dependency-security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Checkout repository code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Setup .NET SDK for dependency scanning
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Restore dependencies to evaluate resolved package graph
+      - name: Restore dependencies
+        run: dotnet restore ./PlaywrightSiteTAF.sln
+
+      # Scan for known vulnerable NuGet dependencies (direct + transitive)
+      - name: Scan vulnerable dependencies
+        shell: pwsh
+        run: |
+          dotnet list ./PlaywrightSiteTAF.sln package --vulnerable --include-transitive --format json | Out-File -FilePath dependency-vulnerabilities.json -Encoding utf8
+          $raw = Get-Content dependency-vulnerabilities.json -Raw
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            throw "Dependency scan output is empty."
+          }
+
+          $json = $raw | ConvertFrom-Json
+          $vulnerabilityCount = 0
+
+          foreach ($project in $json.projects) {
+            foreach ($framework in $project.frameworks) {
+              if ($framework.topLevelPackages) {
+                foreach ($package in $framework.topLevelPackages) {
+                  if ($package.vulnerabilities) {
+                    $vulnerabilityCount += $package.vulnerabilities.Count
+                  }
+                }
+              }
+              if ($framework.transitivePackages) {
+                foreach ($package in $framework.transitivePackages) {
+                  if ($package.vulnerabilities) {
+                    $vulnerabilityCount += $package.vulnerabilities.Count
+                  }
+                }
+              }
+            }
+          }
+
+          "Detected vulnerabilities: $vulnerabilityCount" | Out-Host
+          if ($vulnerabilityCount -gt 0) {
+            throw "Vulnerable dependencies detected: $vulnerabilityCount"
+          }
+
+      # Always upload vulnerability report artifact
+      - name: Upload vulnerability report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-vulnerability-report
+          path: dependency-vulnerabilities.json
+          if-no-files-found: warn
+
+  selenium-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+
+    steps:
+      # Checkout repository code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Setup .NET SDK with NuGet package cache
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Ensure Chrome and virtual display are available for Selenium UI tests
+      - name: Install browser dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb
+          if ! command -v google-chrome >/dev/null 2>&1; then
+            wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+            sudo apt-get install -y ./google-chrome-stable_current_amd64.deb
+          fi
+
+      # Restore NuGet packages
+      - name: Restore dependencies
+        run: dotnet restore ./PlaywrightSiteTAF.sln
+
+      # Build test solution
+      - name: Build
+        run: dotnet build ./PlaywrightSiteTAF.sln --configuration Release --no-restore
+
+      # Run NUnit Selenium tests
+      - name: Run tests
+        run: |
+          mkdir -p ./TestResults
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            dotnet test ./PlaywrightSiteTAF.sln \
+            --configuration Release \
+            --no-build \
+            --logger "html;LogFileName=NavigationReport.html" \
+            --logger "trx;LogFileName=test-results.trx" \
+            --results-directory ./TestResults
+
+      # Create lightweight test summary in the job UI
+      - name: Test summary
+        if: always()
+        run: |
+          echo "## NUnit + Selenium run" >> $GITHUB_STEP_SUMMARY
+          find ./TestResults -type f -name "*.trx" -print | sed 's/^/- /' >> $GITHUB_STEP_SUMMARY || true
+
+      # Always upload NUnit test result files
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nunit-test-results
+          path: |
+            TestResults/**/*.trx
+            **/TestResults/*.trx
+            **/TestResults/**/*.xml
+          if-no-files-found: warn
+
+      # Always upload HTML test report for dashboard publishing
+      - name: Upload HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nunit-html-report
+          path: |
+            TestResults/**/*.html
+            **/TestResults/**/*.html
+          if-no-files-found: warn
+
+      # Build a lightweight dashboard bundle without GitHub Pages
+      - name: Build dashboard artifact
+        if: always()
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ./dashboard-artifact
+          report_file=$(find ./TestResults -type f -name '*.html' | head -n 1 || true)
+
+          if [ -z "$report_file" ]; then
+            cat > ./dashboard-artifact/index.html << 'EOF'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Test Dashboard</title></head>
+          <body><h1>NUnit + Selenium Test Dashboard</h1><p>No HTML report was produced in this run.</p></body></html>
+          EOF
+          else
+            cp "$report_file" ./dashboard-artifact/report.html
+            cat > ./dashboard-artifact/index.html << 'EOF'
+          <!doctype html>
+          <html lang="en"><head><meta charset="utf-8"><title>Test Dashboard</title></head>
+          <body>
+            <h1>NUnit + Selenium Test Dashboard</h1>
+            <p><a href="report.html">Open full test report</a></p>
+            <iframe src="report.html" style="width:100%;height:90vh;border:1px solid #ccc;"></iframe>
+          </body>
+          </html>
+          EOF
+          fi
+
+      # Upload dashboard bundle as artifact (works without GitHub Pages)
+      - name: Upload dashboard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nunit-test-dashboard
+          path: ./dashboard-artifact
+          if-no-files-found: warn
+
+      # Always upload Selenium diagnostics (if produced)
+      - name: Upload Selenium artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-artifacts
+          path: |
+            **/test-results/**
+            **/screenshots/**
+          if-no-files-found: warn

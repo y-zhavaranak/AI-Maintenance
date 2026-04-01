@@ -11,10 +11,12 @@ public abstract class TestBase
     public void SetUp()
     {
         var options = new ChromeOptions();
-        options.AddArgument("--start-maximized");
+        options.AddArgument("--window-size=1920,1080");
+        options.AddArgument("--no-sandbox");
+        options.AddArgument("--disable-dev-shm-usage");
 
         Driver = new ChromeDriver(options);
-        Driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
+        Driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
     }
 
     [TearDown]

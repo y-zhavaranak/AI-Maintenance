@@ -14,7 +14,7 @@ public abstract class TestBase
         options.AddArgument("--start-maximized");
 
         Driver = new ChromeDriver(options);
-        Driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
+        Driver.Manage().Timeouts().ImplicitWait = TimeSpan.Zero;
     }
 
     [TearDown]

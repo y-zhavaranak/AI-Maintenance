@@ -1,0 +1,64 @@
+name: Selenium NUnit Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selenium-nunit-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  playwright-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: true
+
+    steps:
+      # Checkout repository code
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Setup .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Restore NuGet packages
+      - name: Restore dependencies
+        run: dotnet restore .\PlaywrightSiteTAF.sln
+
+      # Build test solution
+      - name: Build
+        run: dotnet build .\PlaywrightSiteTAF.sln --configuration Release --no-restore
+
+      # Run NUnit Selenium tests
+      - name: Run tests
+        run: dotnet test .\PlaywrightSiteTAF.sln --configuration Release --no-build --logger "trx;LogFileName=test-results.trx"
+
+      # Always upload NUnit test result files
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nunit-test-results
+          path: |
+            **/TestResults/*.trx
+            **/TestResults/**/*.xml
+          if-no-files-found: warn
+
+      # Always upload Selenium diagnostics (if produced)
+      - name: Upload Selenium artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selenium-artifacts
+          path: |
+            **/test-results/**
+            **/screenshots/**
+          if-no-files-found: warn
